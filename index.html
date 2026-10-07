@@ -3958,7 +3958,7 @@ const FIELD={
   const SCREENS={
     /* ===== JOURNEY 1 · I KNOW WHAT'S WRONG ===== */
     know(d){
-      const list=[...SCRIPTS[S.fault].rcList,OTHER];
+      const list=[...SCRIPTS[S.fault].rcList];
       screen(d,{eyebrow:'आपकी जानकारी',q:'क्या ख़राब है?',
         detail:X().alreadyFixed?'जो ठीक किया, वह चुनिए।':'जो आपको पता है, वह चुनिए।',
         labels:list,showAll:true,prog:20,onPick:(i,l)=>{
@@ -3998,12 +3998,11 @@ const FIELD={
     fixed(d){
       const x=X();
       screen(d,{eyebrow:'आपकी जानकारी',q:'क्या आपने इसे ठीक कर दिया?',detail:x.cause,
-        labels:['✅ हाँ, ठीक कर दिया','👷 नहीं, मेंटेनेंस / इंजीनियर चाहिए','⏳ अभी ठीक कर रहा हूँ'],
+        labels:['✅ हाँ, ठीक कर दिया','👷 नहीं, मेंटेनेंस / इंजीनियर चाहिए'],
         kind:'action',prog:55,onPick:(i)=>{
           if(i===0){x.fixed=true;ping('KNOW','ख़ुद ठीक किया');navGo({t:'did'});}
           else if(i===1){x.fixed=false;ping('KNOW','मदद चाहिए');FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
             S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'कारण: '+x.cause});escalate('know');}
-          else{x.fixed='working';ping('KNOW','अभी ठीक कर रहे हैं');navGo({t:'working'});}
         }});
     },
     working(d){
@@ -4075,15 +4074,13 @@ const FIELD={
 
     /* ===== JOURNEY 2 · ALARM IS WRONG ===== */
     alarm(d){
-      const opts=[OK_LINE[S.fault],'पहले ही ठीक हो चुका है','दिक़्क़त किसी और मशीन में है','यह मशीन हमारे प्लांट में नहीं है','❓ कुछ और'];
+      const opts=[OK_LINE[S.fault],'दिक़्क़त किसी और मशीन में है','❓ कुछ और'];
       screen(d,{eyebrow:'अलार्म गलत',q:'आपने क्या देखा?',detail:'जो सही हो, वह चुनिए।',labels:opts,showAll:true,prog:30,onPick:(i,l)=>{
         const x=X();x.alarm=l.replace(/^❓\s*/,'');
         ping('ALARM','अलार्म गलत — '+x.alarm,'high');
         logEvent('ALARM','Operator says alarm is wrong: '+x.alarm,'hi');
-        if(i===1){x.entry='alarm→fixed';x.alreadyFixed=true;navGo({t:'know'});}
-        else if(i===2)navGo({t:'which'});
-        else if(i===3){S.rootCause='ALARM_WRONG: '+x.alarm;done('धन्यवाद। यह बात मॉनिटरिंग टीम तक पहुँच गई।');}
-        else if(i===4)navGo({t:'voice',next:'photo'});
+        if(i===1)navGo({t:'which'});
+        else if(i===2)navGo({t:'voice',next:'photo'});
         else navGo({t:'photo'});
       }});
     },

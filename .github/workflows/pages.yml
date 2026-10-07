@@ -28,6 +28,7 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp index.html _site/
+          for d in */; do [ -f "$d/index.html" ] && mkdir -p "_site/$d" && cp "$d/index.html" "_site/$d"; done
           touch _site/.nojekyll
           test -s _site/index.html
       - uses: actions/configure-pages@v5

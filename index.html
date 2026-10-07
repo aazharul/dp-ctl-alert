@@ -3869,7 +3869,7 @@ const FIELD={
   finish=function(){
     _finish();
     FIELD.finished=true;
-    $('doneSub').innerHTML='आपकी जाँच दर्ज हो गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+    $('doneSub').innerHTML=S.escalatedAt?'आपने सही समय पर बताया।<br>आपकी बात सनी सर और इंजीनियर तक पहुँचा दी है — मदद आ रही है।':'आपने पूरी जाँच ध्यान से की।<br>आपकी जानकारी से प्लांट ठीक चलता रहेगा।';
     document.querySelectorAll('#scr-done .btn').forEach(b=>b.style.display='none');
     const steps=S.steps.map(s=>`${s.label} ${s.dwell}s`).join(' → ');
     ping((S.abandoned?'ENDED ':'DONE ')+FIELD.op,
@@ -4001,7 +4001,7 @@ const FIELD={
         labels:['✅ हाँ, ठीक कर दिया','👷 नहीं, मेंटेनेंस / इंजीनियर चाहिए'],
         kind:'action',prog:55,onPick:(i)=>{
           if(i===0){x.fixed=true;ping('KNOW','ख़ुद ठीक किया');navGo({t:'did'});}
-          else if(i===1){x.fixed=false;ping('KNOW','मदद चाहिए');FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+          else if(i===1){x.fixed=false;ping('KNOW','मदद चाहिए');FIELD.doneText='आपने सही समय पर बताया।<br>आपकी बात सनी सर और इंजीनियर तक पहुँचा दी है — मदद आ रही है।';
             S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'कारण: '+x.cause});escalate('know');}
         }});
     },
@@ -4010,7 +4010,7 @@ const FIELD={
         labels:['✅ ठीक हो गया','👷 नहीं हो पा रहा — मदद चाहिए'],kind:'action',prog:60,onPick:(i)=>{
           const x=X();
           if(i===0){x.fixed=true;ping('KNOW','काम पूरा — ठीक हो गया');navGo({t:'did'});}
-          else{x.fixed=false;ping('KNOW','ठीक नहीं हो पाया — मदद');FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+          else{x.fixed=false;ping('KNOW','ठीक नहीं हो पाया — मदद');FIELD.doneText='आपने सही समय पर बताया।<br>आपकी बात सनी सर और इंजीनियर तक पहुँचा दी है — मदद आ रही है।';
             S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'ठीक नहीं हो पाया — '+x.cause});escalate('know');}
         }});
     },
@@ -4028,8 +4028,8 @@ const FIELD={
       screen(d,{eyebrow:'आख़िरी सवाल',q:STOPPED_Q[S.fault],
         labels:['हाँ, ठीक है','नहीं, अभी भी दिक़्क़त है'],kind:'action',prog:90,onPick:(i)=>{
           x.stopped=(i===0);ping('KNOW',x.stopped?'दिक़्क़त ख़त्म':'दिक़्क़त बाक़ी');
-          if(x.stopped)done('धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');
-          else{FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+          if(x.stopped)done('आपने दिक़्क़त ख़ुद ठीक कर दी — बहुत बढ़िया काम।<br>सनी सर एक बार देख लेंगे, आप निश्चिंत रहें।');
+          else{FIELD.doneText='आपने सही समय पर बताया।<br>आपकी बात सनी सर और इंजीनियर तक पहुँचा दी है — मदद आ रही है।';
             S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'ठीक करने के बाद भी दिक़्क़त — '+x.cause});escalate('know');}
         }});
     },
@@ -4045,7 +4045,7 @@ const FIELD={
       const next=()=>{const n=d.next;
         if(n==='stopped')navGo({t:'stopped'});
         else if(n==='photo')navGo({t:'photo'});
-        else done(X().entry==='alarm'?'धन्यवाद। मॉनिटरिंग टीम देखेगी।':'धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');};
+        else done(X().entry==='alarm'?'आपने ख़ुद जाकर देखा, यह बहुत काम की बात है।<br>हम यह अलार्म ठीक करेंगे, ताकि आपको बेवजह परेशान न होना पड़े।':'आपने दिक़्क़त ख़ुद ठीक कर दी — बहुत बढ़िया काम।<br>सनी सर एक बार देख लेंगे, आप निश्चिंत रहें।');};
       let rec=null,chunks=[],timer=null;
       $('recSkip').onclick=()=>{if(rec&&rec.state==='recording')return;next();};
       $('recBtn').onclick=async()=>{
@@ -4097,7 +4097,7 @@ const FIELD={
         <button class="vans secondary" id="phSkip">आगे बढ़ें</button>`;
       attach(b,box);
       const end=()=>{const x=X();S.rootCause='ALARM_WRONG: '+x.alarm+(x.machine?' ('+x.machine+')':'');
-        done('धन्यवाद। मॉनिटरिंग टीम देखेगी।');};
+        done('आपने ख़ुद जाकर देखा, यह बहुत काम की बात है।<br>हम यह अलार्म ठीक करेंगे, ताकि आपको बेवजह परेशान न होना पड़े।');};
       $('phSkip').onclick=end;
       $('phIn').onchange=e=>{
         const f=e.target.files&&e.target.files[0];if(!f)return;
@@ -4154,6 +4154,7 @@ const FIELD={
   finish=function(){
     const t=FIELD.doneText;_finishX();
     if(t)$('doneSub').innerHTML=t;
+    Object.assign($('doneSub').style,{fontSize:'18px',lineHeight:'1.65',color:'var(--ink, #1A2533)',fontWeight:'500',maxWidth:'330px'});
     const x=X();
     ping('JOURNEY',`रास्ता: ${x.entry}`+(x.cause?` · कारण: ${x.cause}`:'')+(x.checked!=null?` · जाँच: ${{skipped:'नहीं की (पक्का था)',confirmed:'की — सही निकला',rejected:'की — गलत निकला'}[x.checked]}`:'')+
       (x.fixed!=null?` · ख़ुद ठीक: ${x.fixed}`:'')+(x.action?` · किया: ${x.action}`:'')+(x.voice?' · आवाज़ नोट':'')+

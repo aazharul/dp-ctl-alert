@@ -3892,6 +3892,284 @@ const FIELD={
   });
 })();
 
+/* =====================================================================
+   TWO NEW ENTRIES ON THE ALERT CARD (Oct 2026)
+   - "मुझे पता है क्या ख़राब है"  → pick cause → (check it) → fixed? → what did
+     you do (+ optional voice note) → did it stop? → done, pending verification
+   - "सब ठीक है, अलार्म गलत है"    → what did you see → (which machine) →
+     (optional photo) → done, monitoring confirms
+   Built for a 45+ operator, Class X: one question per screen, big buttons,
+   every screen read aloud, no typing anywhere.
+   ===================================================================== */
+(function(){
+  const asc=s=>String(s||'').replace(/[^\x20-\x7E]/g,'').trim()||'op';
+  const tag=()=>`${FIELD.op} · v${FIELD.variant} · ${FIELD.fault} · run ${FIELD.run}`;
+  const secs=()=>Math.round((new Date()-FIELD.openedAt)/1000);
+  const ping=(t,b,p)=>FIELD.ping&&FIELD.ping(t+' '+FIELD.op,`${tag()}\n${b} · +${secs()}s`,p||'default');
+
+  /* ---------- per-fault content ---------- */
+  const CAUSE_CHECK={            // cause → the one tree step that confirms it, and the confirming answers
+    A:{'प्रेशर बहुत ज़्यादा है':{n:2,yes:[0]},
+       'मैकेनिकल सील ख़राब है':{n:4,yes:[0]},
+       'पंप के पुर्ज़े ढीले हैं':{n:5,yes:[0,1]},
+       'बेयरिंग ख़राब है — बदलना पड़ेगा':{n:6,yes:[0]}},
+    B:{'ब्लोअर बंद/ट्रिप':{n:1,yes:[1]},
+       'एयर वाल्व बंद':{n:2,yes:[1]},
+       'डिफ्यूज़र ख़राब':{n:3,yes:[1]},
+       'ज़्यादा लोड':{n:4,yes:[0]}}
+  };
+  const ACTIONS={                // "what did you do" — big buttons per cause
+    'प्रेशर बहुत ज़्यादा है':['🔧 वाल्व खोला','🌀 फ़िल्टर बैकवॉश किया'],
+    'मैकेनिकल सील ख़राब है':['🔩 सील बदली','⏹ पंप बंद किया'],
+    'पंप के पुर्ज़े ढीले हैं':['🔧 पैकिंग / बोल्ट कसे','⏹ पंप बंद किया'],
+    'बेयरिंग ख़राब है — बदलना पड़ेगा':['🛢 ग्रीस डाली','🔩 बेयरिंग बदली','⏹ पंप बंद किया'],
+    'ब्लोअर बंद/ट्रिप':['🔁 ब्लोअर रीसेट करके चालू किया'],
+    'एयर वाल्व बंद':['🔧 एयर वाल्व खोला'],
+    'डिफ्यूज़र ख़राब':['🧽 डिफ्यूज़र साफ़ किया'],
+    'ज़्यादा लोड':['🪣 स्लज निकाला']
+  };
+  const STOPPED_Q={A:'क्या लीक अब रुक गया है?',B:'क्या ऑक्सीजन अब ठीक है?'};
+  const OK_LINE={A:'पंप ठीक चल रहा है, कोई लीक नहीं',B:'टैंक ठीक है, बुलबुले ठीक उठ रहे हैं'};
+  const MACHINES=['दूसरा पंप','ब्लोअर','फ़िल्टर','कुछ और'];
+  const OTHER='❓ कुछ और ख़राब है';
+
+  /* ---------- state ---------- */
+  function X(){
+    if(!S.x)S.x={entry:'tree',cause:'',checked:null,fixed:null,action:'',voice:false,
+                 stopped:null,alarm:'',machine:'',photo:false,alreadyFixed:false};
+    return S.x;
+  }
+
+  /* ---------- shared screen helper: one question, big buttons ---------- */
+  function screen(d,{eyebrow,q,detail,art,labels,kind,onPick,prog,showAll}){
+    redrawCurrent=()=>SCREENS[d.t](d);
+    if(prog!=null)$('progFill').style.width=prog+'%';
+    const b=cpBubble(`<div class="eyebrow">${eyebrow}</div>
+      <div class="cqrow"><div class="cq">${q}</div><button class="cqspk" onclick="event.stopPropagation();speakStage()" title="सुनें" aria-label="सुनें">🔊</button></div>
+      ${detail?`<div class="cd">${detail}</div>`:''}${art||''}`);
+    if(labels){const blk=answerBlock(labels,onPick,kind);
+      if(showAll){blk.querySelectorAll('.vans').forEach(x=>x.style.display='');const m=blk.querySelector('.vmore');if(m)m.remove();}
+      attach(b,blk);}
+    narrateCurrent();
+    return b;
+  }
+  function done(text){FIELD.doneText=text;finish();}
+
+  const SCREENS={
+    /* ===== JOURNEY 1 · I KNOW WHAT'S WRONG ===== */
+    know(d){
+      const list=[...SCRIPTS[S.fault].rcList,OTHER];
+      screen(d,{eyebrow:'आपकी जानकारी',q:'क्या ख़राब है?',
+        detail:X().alreadyFixed?'जो ठीक किया, वह चुनिए।':'जो आपको पता है, वह चुनिए।',
+        labels:list,showAll:true,prog:20,onPick:(i,l)=>{
+          const x=X();x.cause=l===OTHER?'कुछ और':l;S.rootCause=x.cause;
+          ping('KNOW',`कारण बताया: ${x.cause}`);
+          logEvent('KNOW','Operator declared cause: '+x.cause,'hi');
+          if(x.alreadyFixed)return navGo({t:'did'});
+          const chk=(CAUSE_CHECK[S.fault]||{})[l];
+          navGo(chk?{t:'sure'}:{t:'fixed'});
+        }});
+    },
+    sure(d){
+      const x=X();
+      screen(d,{eyebrow:'आपकी जानकारी',q:'पक्का है?',detail:x.cause,
+        labels:['हाँ, पक्का है','एक बार जाँच लें'],kind:'action',prog:30,onPick:(i)=>{
+          if(i===0){x.checked='skipped';ping('KNOW','पक्का है — बिना जाँच');navGo({t:'fixed'});}
+          else{ping('KNOW','जाँच चुनी');navGo({t:'kcheck'});}
+        }});
+    },
+    kcheck(d){
+      const x=X();const chk=CAUSE_CHECK[S.fault][Object.keys(CAUSE_CHECK[S.fault]).find(k=>k===x.cause)];
+      const st=SCRIPTS[S.fault].steps[chk.n-1];
+      screen(d,{eyebrow:'एक जाँच',q:st.q,art:illusBox(st.illus),
+        labels:st.opts.map(o=>o.label),prog:40,onPick:(i,l)=>{
+          const ok=chk.yes.includes(i);x.checked=ok?'confirmed':'rejected';
+          ping('KNOW',`जाँच: "${l}" → ${ok?'कारण सही':'कारण नहीं मिला'}`);
+          navGo(ok?{t:'fixed'}:{t:'notit'});
+        }});
+    },
+    notit(d){
+      screen(d,{eyebrow:'जाँच',q:'यह कारण नहीं लगता।',detail:'अब क्या करें?',
+        labels:['दूसरा कारण चुनें','पूरी जाँच करें'],kind:'action',prog:40,onPick:(i)=>{
+          ping('KNOW',i===0?'दूसरा कारण चुनने गए':'पूरी जाँच पर गए');
+          if(i===0)navGo({t:'know'});else{X().entry='know→tree';S.rootCause='';navGo({t:'step',n:1});}
+        }});
+    },
+    fixed(d){
+      const x=X();
+      screen(d,{eyebrow:'आपकी जानकारी',q:'क्या आपने इसे ठीक कर दिया?',detail:x.cause,
+        labels:['✅ हाँ, ठीक कर दिया','👷 नहीं, मेंटेनेंस / इंजीनियर चाहिए','⏳ अभी ठीक कर रहा हूँ'],
+        kind:'action',prog:55,onPick:(i)=>{
+          if(i===0){x.fixed=true;ping('KNOW','ख़ुद ठीक किया');navGo({t:'did'});}
+          else if(i===1){x.fixed=false;ping('KNOW','मदद चाहिए');FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+            S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'कारण: '+x.cause});escalate('know');}
+          else{x.fixed='working';ping('KNOW','अभी ठीक कर रहे हैं');navGo({t:'working'});}
+        }});
+    },
+    working(d){
+      screen(d,{eyebrow:'काम चल रहा है',q:'ठीक हो जाए तो नीचे दबाइए।',detail:'तब तक यह पेज खुला रहने दें।',
+        labels:['✅ ठीक हो गया','👷 नहीं हो पा रहा — मदद चाहिए'],kind:'action',prog:60,onPick:(i)=>{
+          const x=X();
+          if(i===0){x.fixed=true;ping('KNOW','काम पूरा — ठीक हो गया');navGo({t:'did'});}
+          else{x.fixed=false;ping('KNOW','ठीक नहीं हो पाया — मदद');FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+            S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'ठीक नहीं हो पाया — '+x.cause});escalate('know');}
+        }});
+    },
+    did(d){
+      const x=X();
+      const acts=[...(ACTIONS[x.cause]||[]),'❓ कुछ और किया'];
+      screen(d,{eyebrow:'आपने क्या किया',q:'आपने क्या किया?',detail:'एक चुनिए।',
+        labels:acts,prog:70,onPick:(i,l)=>{
+          x.action=l.replace(/^\S+\s/,'');ping('KNOW','क्या किया: '+x.action);
+          navGo({t:'voice',next:x.alreadyFixed?'end':'stopped'});
+        }});
+    },
+    stopped(d){
+      const x=X();
+      screen(d,{eyebrow:'आख़िरी सवाल',q:STOPPED_Q[S.fault],
+        labels:['हाँ, ठीक है','नहीं, अभी भी दिक़्क़त है'],kind:'action',prog:90,onPick:(i)=>{
+          x.stopped=(i===0);ping('KNOW',x.stopped?'दिक़्क़त ख़त्म':'दिक़्क़त बाक़ी');
+          if(x.stopped)done('धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');
+          else{FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
+            S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'ठीक करने के बाद भी दिक़्क़त — '+x.cause});escalate('know');}
+        }});
+    },
+
+    /* ===== OPTIONAL VOICE NOTE (used by both journeys) ===== */
+    voice(d){
+      const b=screen(d,{eyebrow:'ज़रूरी नहीं',q:'बोलकर बताना है?',
+        detail:'बटन दबाइए, बोलिए, फिर दोबारा दबाइए।',prog:80});
+      const box=document.createElement('div');box.className='vanswers act';
+      box.innerHTML=`<button class="vans" id="recBtn">🎤 बोलना शुरू करें</button>
+        <button class="vans secondary" id="recSkip">आगे बढ़ें</button>`;
+      attach(b,box);
+      const next=()=>{const n=d.next;
+        if(n==='stopped')navGo({t:'stopped'});
+        else if(n==='photo')navGo({t:'photo'});
+        else done(X().entry==='alarm'?'धन्यवाद। मॉनिटरिंग टीम देखेगी।':'धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');};
+      let rec=null,chunks=[],timer=null;
+      $('recSkip').onclick=()=>{if(rec&&rec.state==='recording')return;next();};
+      $('recBtn').onclick=async()=>{
+        const btn=$('recBtn');
+        if(rec&&rec.state==='recording'){rec.stop();return;}
+        try{shutUp();}catch(e){}
+        if(!navigator.mediaDevices||!window.MediaRecorder){note('','इस फ़ोन में रिकॉर्डिंग नहीं चलती — "आगे बढ़ें" दबाइए।');return;}
+        try{
+          const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+          rec=new MediaRecorder(stream);chunks=[];
+          rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+          rec.onstop=()=>{
+            clearTimeout(timer);stream.getTracks().forEach(t=>t.stop());
+            const blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'});
+            const ext=/mp4|aac|m4a/.test(blob.type)?'m4a':(/ogg/.test(blob.type)?'ogg':'webm');
+            upload(blob,`${asc(FIELD.op)}-voice-${FIELD.run}.${ext}`,'VOICE');
+            X().voice=true;btn.innerHTML='✓ भेज दिया';btn.disabled=true;
+            setTimeout(next,900);
+          };
+          rec.start();btn.innerHTML='⏹ बोल लिया — यहाँ दबाइए';btn.style.background='#B3261E';btn.style.borderColor='#B3261E';
+          timer=setTimeout(()=>{if(rec.state==='recording')rec.stop();},60000);
+          ping('VOICE','रिकॉर्डिंग शुरू');
+        }catch(e){note('','माइक नहीं चला — "आगे बढ़ें" दबाइए।');ping('VOICE','माइक नहीं चला: '+(e.name||e));}
+      };
+    },
+
+    /* ===== JOURNEY 2 · ALARM IS WRONG ===== */
+    alarm(d){
+      const opts=[OK_LINE[S.fault],'पहले ही ठीक हो चुका है','दिक़्क़त किसी और मशीन में है','यह मशीन हमारे प्लांट में नहीं है','❓ कुछ और'];
+      screen(d,{eyebrow:'अलार्म गलत',q:'आपने क्या देखा?',detail:'जो सही हो, वह चुनिए।',labels:opts,showAll:true,prog:30,onPick:(i,l)=>{
+        const x=X();x.alarm=l.replace(/^❓\s*/,'');
+        ping('ALARM','अलार्म गलत — '+x.alarm,'high');
+        logEvent('ALARM','Operator says alarm is wrong: '+x.alarm,'hi');
+        if(i===1){x.entry='alarm→fixed';x.alreadyFixed=true;navGo({t:'know'});}
+        else if(i===2)navGo({t:'which'});
+        else if(i===3){S.rootCause='ALARM_WRONG: '+x.alarm;done('धन्यवाद। यह बात मॉनिटरिंग टीम तक पहुँच गई।');}
+        else if(i===4)navGo({t:'voice',next:'photo'});
+        else navGo({t:'photo'});
+      }});
+    },
+    which(d){
+      screen(d,{eyebrow:'अलार्म गलत',q:'किस मशीन में दिक़्क़त है?',labels:MACHINES,prog:55,onPick:(i,l)=>{
+        X().machine=l;ping('ALARM','दिक़्क़त वाली मशीन: '+l,'high');navGo({t:'photo'});
+      }});
+    },
+    photo(d){
+      const b=screen(d,{eyebrow:'ज़रूरी नहीं',q:'एक फ़ोटो भेजनी है?',detail:'मशीन की फ़ोटो खींचिए — या आगे बढ़िए।',prog:80});
+      const box=document.createElement('div');box.className='vanswers act';
+      box.innerHTML=`<label class="vans" id="phLbl" style="display:flex;align-items:center;cursor:pointer">📷 फ़ोटो खींचें
+          <input type="file" accept="image/*" capture="environment" id="phIn" style="display:none"></label>
+        <button class="vans secondary" id="phSkip">आगे बढ़ें</button>`;
+      attach(b,box);
+      const end=()=>{const x=X();S.rootCause='ALARM_WRONG: '+x.alarm+(x.machine?' ('+x.machine+')':'');
+        done('धन्यवाद। मॉनिटरिंग टीम देखेगी।');};
+      $('phSkip').onclick=end;
+      $('phIn').onchange=e=>{
+        const f=e.target.files&&e.target.files[0];if(!f)return;
+        $('phLbl').firstChild.textContent='⏳ भेज रहे हैं…';
+        shrink(f).then(blob=>{upload(blob,`${asc(FIELD.op)}-photo-${FIELD.run}.jpg`,'PHOTO');X().photo=true;
+          $('phLbl').firstChild.textContent='✓ फ़ोटो भेज दी';setTimeout(end,900);});
+      };
+    }
+  };
+
+  /* ---------- uploads go to the same live feed, as attachments ---------- */
+  function upload(blob,name,kind){
+    if(!FIELD.ntfy||/__/.test(FIELD.ntfy))return;
+    try{fetch('https://ntfy.sh/'+encodeURIComponent(FIELD.ntfy),{method:'PUT',body:blob,
+      headers:{'Filename':name,'Title':kind+' '+asc(FIELD.op),'Message':`${asc(FIELD.op)} run ${FIELD.run}`}}).catch(()=>{});}catch(e){}
+  }
+  function shrink(file){
+    return new Promise(res=>{
+      const img=new Image();const url=URL.createObjectURL(file);
+      img.onload=()=>{const k=Math.min(1,1280/Math.max(img.width,img.height));
+        const c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
+        c.toBlob(b=>res(b||file),'image/jpeg',0.72);};
+      img.onerror=()=>res(file);img.src=url;
+    });
+  }
+
+  /* ---------- wire into the flow's own navigation ---------- */
+  const _navRender=navRender;
+  navRender=function(d){SCREENS[d.t]?SCREENS[d.t](d):_navRender(d);};
+  const LABELS={know:'कारण चुनना',sure:'पक्का?',kcheck:'कारण की जाँच',notit:'कारण नहीं मिला',fixed:'ठीक किया?',
+    working:'ठीक कर रहे',did:'क्या किया',voice:'आवाज़ नोट',stopped:'ठीक हुआ?',alarm:'अलार्म गलत',which:'कौन सी मशीन',photo:'फ़ोटो'};
+  const _stepLabel=stepLabel;
+  stepLabel=function(d){return LABELS[d.t]||_stepLabel(d);};
+
+  /* alert card: the tree stays the main button; the two new ways in sit under it */
+  const _cpIssueX=cpIssue;
+  cpIssue=function(){
+    _cpIssueX();
+    const old=$('vBody').querySelector('.vb.bot .vanswers');if(!old)return;
+    const blk=answerBlock(['जाँच शुरू करें','🔧 मुझे पता है क्या ख़राब है','✅ सब ठीक है, अलार्म गलत है'],(i)=>{
+      const x=X();
+      if(i===0){x.entry='tree';ping('ENTRY','जाँच शुरू की (पूरा फ़्लो)');navGo({t:'step',n:1});}
+      else if(i===1){x.entry='know';ping('ENTRY','मुझे पता है क्या ख़राब है','high');navGo({t:'know'});}
+      else{x.entry='alarm';ping('ENTRY','सब ठीक है, अलार्म गलत है','high');navGo({t:'alarm'});}
+    },'action');
+    blk.querySelectorAll('.vans.secondary').forEach(b=>{b.style.color='var(--ink, #1A2533)';b.style.fontWeight='600';});
+    old.replaceWith(blk);
+    lastNarrated='';narrateCurrent();
+  };
+
+  /* done screen text per journey, and the journey in the saved run + summary */
+  const _finishX=finish;
+  finish=function(){
+    const t=FIELD.doneText;_finishX();
+    if(t)$('doneSub').innerHTML=t;
+    const x=X();
+    ping('JOURNEY',`रास्ता: ${x.entry}`+(x.cause?` · कारण: ${x.cause}`:'')+(x.checked!=null?` · जाँच: ${{skipped:'नहीं की (पक्का था)',confirmed:'की — सही निकला',rejected:'की — गलत निकला'}[x.checked]}`:'')+
+      (x.fixed!=null?` · ख़ुद ठीक: ${x.fixed}`:'')+(x.action?` · किया: ${x.action}`:'')+(x.voice?' · आवाज़ नोट':'')+
+      (x.stopped!=null?` · रुका: ${x.stopped?'हाँ':'नहीं'}`:'')+(x.alarm?` · अलार्म गलत: ${x.alarm}`:'')+
+      (x.machine?` · मशीन: ${x.machine}`:'')+(x.photo?' · फ़ोटो':''),'high');
+  };
+  const _snapshot=snapshot;
+  snapshot=function(){const o=_snapshot();o.journey=X();return o;};
+  /* the flow's own escalation ends the run; the new journeys rely on that too */
+  const _esc=escalate;
+  escalate=function(src){_esc(src==='know'?'flow':src);};
+})();
+
 autoStart();
 
 </script>

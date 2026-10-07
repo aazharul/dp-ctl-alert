@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Saved runs</title>
+<style>
+:root{--ink:#1A2533;--muted:#6B7785;--line:#E2E6EA;--navy:#002454;--bg:#F7F6F2}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+main{padding:16px;max-width:640px;margin:0 auto}
+h1{font-size:20px;margin:4px 0 2px;color:var(--navy)} .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.run{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.run b{color:var(--navy)} .row{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:3px 0;border-top:1px dotted var(--line)}
+.row:first-of-type{border-top:0} .row span:first-child{color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+button{font:600 15px system-ui;padding:12px 16px;border-radius:8px;border:0;background:var(--navy);color:#fff}
+button.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+textarea{width:100%;box-sizing:border-box;height:160px;font:12px ui-monospace,monospace;border:1px solid var(--line);border-radius:6px;padding:8px}
+.empty{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;color:var(--muted)}
+</style></head><body><main>
+<h1>Saved runs on this phone</h1>
+<div class="sub">Read from this browser only. If it is empty, open this link in the browser the alert link opened in.</div>
+<div id="list"></div>
+<div class="btns">
+  <button onclick="share()">Send via WhatsApp</button>
+  <button class="sec" onclick="copyAll()">Copy</button>
+</div>
+<textarea id="raw" readonly></textarea>
+</main>
+<script>
+let runs=[];try{runs=JSON.parse(localStorage.getItem('dp_round2_runs'))||[];}catch(e){}
+const L=document.getElementById('list');
+const yn=v=>v?'yes':'no';
+function fmtTime(s){try{return new Date(s).toLocaleString('en-IN');}catch(e){return s||'—';}}
+if(!runs.length){L.innerHTML='<div class="empty">No saved runs in this browser.</div>';}
+else{
+  L.innerHTML=runs.map((r,i)=>`<div class="run"><b>Run ${i+1} · ${r.op||'—'}</b>
+  ${[['Finished at',fmtTime(r.at)],['Fault',r.fault],['Root cause picked',r.rootCause||'—'],
+     ['Abandoned',r.abandoned?('yes, at '+(r.abandonStep||'—')):'no'],
+     ['Total taps',r.totalTaps],['Repeated (dead) taps',r.deadTaps],['Longest time on one step',(r.maxDwell||0)+'s'],
+     ['Dr Paani opened',r.helpOpens],['Supervisor calls',r.supervisorCalls],['Asked engineer',yn(r.escalated)],
+     ['Media viewed',r.mediaViews]].map(([k,v])=>`<div class="row"><span>${k}</span><span>${v??'—'}</span></div>`).join('')}</div>`).join('');
+}
+const json=JSON.stringify(runs,null,1);
+document.getElementById('raw').value=json;
+function text(){return 'DP alert runs ('+runs.length+')\n'+json;}
+function share(){location.href='https://wa.me/?text='+encodeURIComponent(text().slice(0,3500));}
+function copyAll(){const t=document.getElementById('raw');t.select();
+  (navigator.clipboard?navigator.clipboard.writeText(text()):Promise.reject()).then(()=>alert('Copied'),()=>{document.execCommand('copy');alert('Copied');});}
+</script></body></html>

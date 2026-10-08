@@ -3769,7 +3769,7 @@ window.addEventListener('keydown',e=>{if(e.key==='Escape'&&helpOpen)closeHelp('e
 const FIELD={
   /* EDIT THESE THREE before sending links */
   reportTo:'__REPORT_TO__',            // WhatsApp number, digits only with country code, e.g. 919812345678
-  supervisor:{name:'सनी (सुपरवाइज़र)',tel:'__SUP_TEL__'},   // who the call button dials
+  supervisor:{name:'आकाश (सुपरवाइज़र)',tel:'__SUP_TEL__'},   // who the call button dials
   ntfy:'dp-ctl-bbf8fc86ea78',               // live event feed topic
   finished:false, lastStep:'—'
 };
@@ -4028,7 +4028,7 @@ const FIELD={
       screen(d,{eyebrow:'आख़िरी सवाल',q:STOPPED_Q[S.fault],
         labels:['हाँ, ठीक है','नहीं, अभी भी दिक़्क़त है'],kind:'action',prog:90,onPick:(i)=>{
           x.stopped=(i===0);ping('KNOW',x.stopped?'दिक़्क़त ख़त्म':'दिक़्क़त बाक़ी');
-          if(x.stopped)done('धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');
+          if(x.stopped)done('धन्यवाद! आपका काम दर्ज हो गया।<br>आकाश सर / मॉनिटरिंग टीम पुष्टि करेंगे।');
           else{FIELD.doneText='आपकी बात इंजीनियर तक भेजी गई।<br>मॉनिटरिंग टीम आगे देखेगी।';
             S.helpAsks=S.helpAsks||[];S.helpAsks.push({q:'ठीक करने के बाद भी दिक़्क़त — '+x.cause});escalate('know');}
         }});
@@ -4045,7 +4045,7 @@ const FIELD={
       const next=()=>{const n=d.next;
         if(n==='stopped')navGo({t:'stopped'});
         else if(n==='photo')navGo({t:'photo'});
-        else done(X().entry==='alarm'?'धन्यवाद। मॉनिटरिंग टीम देखेगी।':'धन्यवाद! आपका काम दर्ज हो गया।<br>सनी सर / मॉनिटरिंग टीम पुष्टि करेंगे।');};
+        else done(X().entry==='alarm'?'धन्यवाद। मॉनिटरिंग टीम देखेगी।':'धन्यवाद! आपका काम दर्ज हो गया।<br>आकाश सर / मॉनिटरिंग टीम पुष्टि करेंगे।');};
       let rec=null,chunks=[],timer=null;
       $('recSkip').onclick=()=>{if(rec&&rec.state==='recording')return;next();};
       $('recBtn').onclick=async()=>{
